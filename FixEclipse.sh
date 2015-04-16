@@ -1,0 +1,1 @@
+rm /Vagabundo/thomas/Documents/Eclipse_workspace/.metadata/.lock

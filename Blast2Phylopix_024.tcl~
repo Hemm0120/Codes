@@ -1,0 +1,329 @@
+#!/usr/bin/tcl -f
+
+################################################
+#               BLAST parser                   #
+# Parser extracts description line, identity,  #
+# expectation and direction of translation     #
+# frame from results of BLAST(N)(P)(X) search  #
+#                                              #
+# Alexander Kozik, Copyright, February 12 2002 #
+#                                              #
+################################################
+
+# BLAST-X Procedure
+proc BlastX_Parser_Subject {f_out current_line query_id description_switch frame_info} {
+
+    global subject_found
+    global normalize_exp
+
+    set empty_string ""
+    set subject_pattern {^\>}
+    set score_pattern {Score =}
+    set expect_pattern {Expect}
+    set identity_pattern {Identities =}
+    set positives_pattern {Positives =}
+    set frame_pattern {Frame =}
+    if {[regexp "$subject_pattern" "$current_line"]} {
+	regsub $subject_pattern $current_line $empty_string current_description
+        regsub {^gi\|} $current_description $empty_string current_description
+	########
+	regsub {\|} $current_description "\t" current_description
+	########
+	if {$description_switch == "N" || $description_switch == "n"} {
+	    regsub {\s.*} $current_description $empty_string current_description
+	    regsub {\|.*} $current_description $empty_string current_description
+	}
+	puts -nonewline $f_out "$query_id\t$current_description\t"
+    }
+    if {[regexp "$score_pattern" "$current_line"] && [regexp "$expect_pattern" "$current_line"] && $subject_found == "YES"} {
+	regsub {Score =.*Expect} $current_line $empty_string current_exp
+	regsub {\=} $current_exp $empty_string current_exp
+	regsub {\(.*\)} $current_exp $empty_string current_exp
+	regsub -all { } $current_exp $empty_string current_exp
+        if [regexp {^e-} $current_exp] {
+                regsub {e-} $current_exp "1e-" current_exp
+        }
+	if {$normalize_exp == "Y" || $normalize_exp == "y"} {
+	    if {$current_exp == 0} {
+		set current_exp 1e-101
+	    }
+	    set current_exp [expr -log10($current_exp)]
+	    if {$current_exp > 100} {
+		set current_exp 100
+	    }
+	    set current_exp round($current_exp)
+	    set current_exp [expr $current_exp/100.00]
+	}
+	puts -nonewline $f_out "$current_exp\t"
+#	set subject_found "NO"
+    }
+    if {[regexp "$identity_pattern" "$current_line"] && [regexp "$positives_pattern" "$current_line"] && $subject_found == "YES"} {
+	set current_sim $current_line
+	regsub {\%\).*Positives =.*\%\)} $current_sim $empty_string current_sim
+	regsub {Identities =.*\(} $current_sim $empty_string current_sim
+	regsub -all { } $current_sim $empty_string current_sim
+	if {$frame_info == "YES"} {
+	    puts -nonewline $f_out "$current_sim\t"
+	} else {
+	    puts $f_out "$current_sim"
+	    set subject_found "NO"
+	}
+    }
+    if {[regexp "$frame_pattern" "$current_line"] && $frame_info == "YES" && $subject_found == "YES"} {
+	set current_frame $current_line
+	regsub $frame_pattern $current_frame "fr=" current_frame
+	regsub -all { } $current_frame $empty_string current_frame
+	puts $f_out "$current_frame"
+	set subject_found "NO"
+    }
+}
+
+# BLAST-P Procedure
+proc BlastP_Parser_Subject {f_out current_line query_id description_switch} {
+
+    global subject_found
+    global normalize_exp
+
+    set empty_string ""
+    set subject_pattern {^\>}
+    set score_pattern {Score =}
+    set expect_pattern {Expect}
+    set identity_pattern {Identities =}
+    set positives_pattern {Positives =}
+    if {[regexp "$subject_pattern" "$current_line"]} {
+	regsub $subject_pattern $current_line $empty_string current_description
+        regsub {^gi\|} $current_description $empty_string current_description
+	########
+	regsub {\|} $current_description "\t" current_description
+	########
+	if {$description_switch == "N" || $description_switch == "n"} {
+	    regsub {\s.*} $current_description $empty_string current_description
+	    regsub {\|.*} $current_description $empty_string current_description
+	}
+	puts -nonewline $f_out "$query_id\t$current_description\t"
+    }
+    if {[regexp "$score_pattern" "$current_line"] && [regexp "$expect_pattern" "$current_line"] && $subject_found == "YES"} {
+	regsub {Score =.*Expect} $current_line $empty_string current_exp
+	regsub {\=} $current_exp $empty_string current_exp
+	regsub {\(.*\)} $current_exp $empty_string current_exp
+	regsub -all { } $current_exp $empty_string current_exp
+        if [regexp {^e-} $current_exp] {
+                regsub {e-} $current_exp "1e-" current_exp
+        }
+	if {$normalize_exp == "Y" || $normalize_exp == "y"} {
+	    if {$current_exp == 0} {
+		set current_exp 1e-101
+	    }
+	    set current_exp [expr -log10($current_exp)]
+	    if {$current_exp > 100} {
+		set current_exp 100
+	    }
+	    set current_exp round($current_exp)
+	    set current_exp [expr $current_exp/100.00]
+	}
+	puts -nonewline $f_out "$current_exp\t"
+    }
+    if {[regexp "$identity_pattern" "$current_line"] && [regexp "$positives_pattern" "$current_line"] && $subject_found == "YES"} {
+	set current_sim $current_line
+	regsub {\%\).*Positives =.*\%\)} $current_sim $empty_string current_sim
+	regsub {Identities =.*\(} $current_sim $empty_string current_sim
+	regsub -all { } $current_sim $empty_string current_sim
+	puts $f_out "$current_sim"
+	set subject_found "NO"
+    }
+}
+
+# BLAST-N Procedure
+proc BlastN_Parser_Subject {f_out current_line query_id description_switch strand_info} {
+
+    global subject_found
+    global normalize_exp
+
+    set empty_string ""
+    set subject_pattern {^\>}
+    set score_pattern {Score =}
+    set expect_pattern {Expect}
+    set identity_pattern {Identities =}
+    set strand_pattern {Strand =}
+    if {[regexp "$subject_pattern" "$current_line"]} {
+	regsub $subject_pattern $current_line $empty_string current_description
+        regsub {^gi\|} $current_description $empty_string current_description
+	########
+	regsub {\|} $current_description "\t" current_description
+	########
+	if {$description_switch == "N" || $description_switch == "n"} {
+	    regsub {\s.*} $current_description $empty_string current_description
+	    regsub {\|.*} $current_description $empty_string current_description
+	}
+	puts -nonewline $f_out "$query_id\t$current_description\t"
+    }
+    if {[regexp "$score_pattern" "$current_line"] && [regexp "$expect_pattern" "$current_line"] && $subject_found == "YES"} {
+	regsub {Score =.*Expect} $current_line $empty_string current_exp
+	regsub {\=} $current_exp $empty_string current_exp
+	regsub {\(.*\)} $current_exp $empty_string current_exp
+	regsub -all { } $current_exp $empty_string current_exp
+	if [regexp {^e-} $current_exp] {
+		regsub {e-} $current_exp "1e-" current_exp
+	}
+	if {$normalize_exp == "Y" || $normalize_exp == "y"} {
+	    if {$current_exp == 0} {
+		set current_exp 1e-101
+	    }
+	    set current_exp [expr -log10($current_exp)]
+	    if {$current_exp > 100} {
+		set current_exp 100
+	    }
+	    set current_exp round($current_exp)
+	    set current_exp [expr $current_exp/100.00]
+	}
+	puts -nonewline $f_out "$current_exp\t"
+    }
+    if {[regexp "$identity_pattern" "$current_line"] && $subject_found == "YES"} {
+	set current_sim $current_line 
+	regsub {\, Gaps =.*\%\)} $current_sim $empty_string current_sim
+	regsub {\%\)} $current_sim $empty_string current_sim
+	regsub {Identities =.*\(} $current_sim $empty_string current_sim
+	regsub -all { } $current_sim $empty_string current_sim
+	if {$strand_info == "YES"} {
+	    puts -nonewline $f_out "$current_sim\t"
+	} else {
+	    puts $f_out "$current_sim"
+	    set subject_found "NO"
+	}
+    }
+    if {[regexp "$strand_pattern" "$current_line"] && $strand_info == "YES" && $subject_found == "YES"} {
+	set current_strand $current_line
+	regsub $strand_pattern $current_strand "str=" current_strand
+	regsub -all { } $current_strand $empty_string current_strand
+	regsub -all {Plus} $current_strand "+" current_strand
+	regsub -all {Minus} $current_strand "-" current_strand
+	puts $f_out "$current_strand"
+	set subject_found "NO"
+    }
+}
+
+#################################
+#         MAIN BODY             #
+#################################
+
+# standard input/output dialog #
+
+puts -nonewline "Enter the SOURCE file name: "
+flush stdout
+
+set sourcefile [gets stdin]
+
+while {[catch {set f_in [open "$sourcefile"  "r"]}] == 1} {
+        puts stderr "Error opening $sourcefile"
+        puts -nonewline "Please re-enter the SOURCE file name: "
+        flush stdout
+        set sourcefile [gets stdin]
+}
+
+puts -nonewline "Enter the DESTINATION file name: "
+flush stdout
+
+set destfile [gets stdin]
+
+set f_out [open "$destfile"  "w"]
+
+puts -nonewline "extract DESCRIPTION line (Y/N): "
+flush stdout
+
+set description_switch [gets stdin]
+
+puts -nonewline "type of BLAST search was blast(n) blast(x) blast(p): "
+flush stdout
+
+set type_of_blast [gets stdin]
+
+if {$type_of_blast == "X" || $type_of_blast == "x"} {
+    puts -nonewline "Extract translation frame info (y)es/(n)o: "
+    flush stdout
+    set frame_info [gets stdin]
+    if {$frame_info == "Y" || $frame_info == "y"} {
+	set frame_info "YES"
+    }
+}
+
+if {$type_of_blast == "N" || $type_of_blast == "n"} {
+    puts -nonewline "Extract strand direction info (y)es/(n)o: "
+    flush stdout
+    set strand_info [gets stdin]
+    if {$strand_info == "Y" || $strand_info == "y"} {
+	set strand_info "YES"
+    }
+}
+
+global normalize_exp
+
+puts -nonewline "normalize EXP value (Y/N): "
+flush stdout
+
+set normalize_exp [gets stdin]
+
+# end of input/output dialog #
+
+global subject_found
+
+set query_pattern {^Query=\s}
+set alignment_pattern_A {^ALIGNMENTS}
+set alignment_pattern_B {\s\s\s\s\s\s\s\s\s\sAlignments}
+set alignment_pattern_C {Sequences producing significant alignments} 
+set alignment_flag "WHATEVER"
+set fasta_header {>}
+set subject_pattern {^\>}
+set new_line "\n"
+set empty_string ""
+
+set lineNumber 0
+set first_line_to_process 0
+
+while {[gets $f_in  current_line] >= 0}  {
+
+        if {$lineNumber >= $first_line_to_process} {
+	    if [regexp "$query_pattern" "$current_line"] {
+		set alignment_flag "OFF"
+		set subject_found "NO"
+		regsub $query_pattern $current_line $empty_string query_id
+		regsub {\s.*} $query_id $empty_string query_id
+		regsub {^gi\|} $query_id $empty_string query_id
+		regsub {\|.*} $query_id $empty_string query_id
+		regsub -all {(\(|\))} $query_id $empty_string query_id
+		regsub -all {\,} $query_id $empty_string query_id
+		if {$description_switch == "Y" || $description_switch == "y"} {
+		    puts $f_out "*** BEST HITS FOR: $query_id\ ***"
+		}
+	    }
+	    if {[regexp "$alignment_pattern_A" "$current_line"] || [regexp "$alignment_pattern_B" "$current_line"] || [regexp "$alignment_pattern_C" "$current_line"]} {
+		set alignment_flag "ON"
+	    }
+	    if [regexp "$subject_pattern" "$current_line"] {
+		set subject_found "YES"
+	    }
+	    if {$alignment_flag == "ON"} {
+		if {$type_of_blast == "X" || $type_of_blast == "x"} {
+		    BlastX_Parser_Subject $f_out $current_line $query_id \
+			    $description_switch $frame_info
+		}
+		if {$type_of_blast == "P" || $type_of_blast == "p"} {
+		    BlastP_Parser_Subject $f_out $current_line $query_id \
+			    $description_switch
+		}
+		if {$type_of_blast == "N" || $type_of_blast == "n"} {
+		    BlastN_Parser_Subject $f_out $current_line $query_id \
+			    $description_switch $strand_info
+		}
+	    }
+	    if [regexp "No significant similarity found" $current_line] {
+		puts $f_out "$query_id\tNo significant similarity found"
+	    }
+            if [regexp "No hits found" $current_line] {
+                puts $f_out "$query_id\tNo significant similarity found"
+            }
+	}
+	incr lineNumber
+    }
+#    puts -nonewline $f_out $new_line
+close $f_in
+close $f_out

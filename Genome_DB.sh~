@@ -1,0 +1,22 @@
+cd /research/gmh/GENOME_DB/faa-Genome/ #Parent Directory of subdirectories containing fasta.tgz files
+
+var=".faa.bz2" #Substring to look for at end of string (file) 
+echo "Stage One"
+for file in *; do
+	bunzip2 -c /research/gmh/GENOME_DB/faa-Genome/$file > /Vagabundo/thomas/Documents/PTOX_DB/${file%.bz2}
+done
+echo "Stage Two"
+cd  /Vagabundo/thomas/Documents/PTOX_DB
+for fileB in *; do #for extracted files..
+	newfile="/Vagabundo/thomas/Documents/PTOX_DB/$fileB" #newfile = one of the faa files
+	/Vagabundo/thomas/bin/hmmsearch -A  /Vagabundo/thomas/Documents/PTOX_DB/${fileB%.faa}.sto  /Vagabundo/thomas/Documents/Ptox.hmm $newfile ##Hmmsearch newfiles vs. AOX HMM
+	
+	if [[ -s /Vagabundo/thomas/Documents/PTOX_DB/${fileB%.faa}.sto ]]; then
+		echo "Significant Hit Found"
+#rm /Vagabundo/thomas/Documents/PTOX_DB/${fileB%.faa}.sto
+		
+	else #remove blank files and nonsignificant .faa files ##Significant .faa files to be compiled later...
+		rm /Vagabundo/thomas/Documents/PTOX_DB/${fileB%.faa}.sto
+		rm $newfile
+	fi
+done 
